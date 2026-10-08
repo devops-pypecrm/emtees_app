@@ -28,7 +28,11 @@ class ApiClient {
         baseUrl: AppConfig.apiBaseUrl,
         connectTimeout: const Duration(seconds: 15),
         receiveTimeout: const Duration(seconds: 20),
-        headers: {'Content-Type': 'application/json'},
+        headers: {
+          'Content-Type': 'application/json',
+          // Lets the backend keep admin/academic-head reports web-only.
+          'x-client-platform': 'mobile',
+        },
       ),
     );
 
