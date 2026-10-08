@@ -5,7 +5,6 @@ import 'package:intl/intl.dart';
 import '../../core/providers.dart';
 import '../auth/auth_provider.dart';
 import 'reports_repository.dart';
-import 'reports_repository.dart';
 
 final reportsRepositoryProvider = Provider<ReportsRepository>((ref) {
   return ReportsRepository(ref.watch(apiClientProvider));
