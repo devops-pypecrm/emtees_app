@@ -54,12 +54,6 @@ class ProfileScreen extends ConsumerWidget {
                     ),
                   ),
                 ),
-                const Divider(height: 1),
-                ListTile(
-                  leading: const Icon(Icons.system_update_outlined),
-                  title: const Text('Check for updates'),
-                  onTap: () => _checkForUpdates(context, ref),
-                ),
               ],
             ),
           ),
@@ -93,20 +87,6 @@ class ProfileScreen extends ConsumerWidget {
         return 'Super Admin';
       default:
         return role ?? '—';
-    }
-  }
-
-  void _checkForUpdates(BuildContext context, WidgetRef ref) async {
-    ref.invalidate(latestReleaseProvider);
-    await ref.read(latestReleaseProvider.future);
-    if (!context.mounted) return;
-    final available = ref.read(availableUpdateProvider);
-    if (available != null) {
-      context.push('/update', extra: available);
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('You are on the latest version.')),
-      );
     }
   }
 

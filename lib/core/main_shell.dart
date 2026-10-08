@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import '../features/auth/auth_provider.dart';
 import '../features/chat/chat_provider.dart';
 import '../features/notifications/notifications_provider.dart';
+import '../features/updates/update_provider.dart';
 import '../models/user.dart';
 
 /// Global key so tab screens (each with their own inner [Scaffold]/AppBar)
@@ -188,6 +189,13 @@ class _AppDrawer extends ConsumerWidget {
                 onTap: () => go('/payments'),
               ),
             ],
+            ListTile(
+              leading: ref.watch(availableUpdateProvider) != null
+                  ? const Badge(child: Icon(Icons.system_update_outlined))
+                  : const Icon(Icons.system_update_outlined),
+              title: const Text('App Update'),
+              onTap: () => _openUpdate(context, ref),
+            ),
             const Divider(),
             ListTile(
               leading: const Icon(Icons.person_outline),
@@ -213,6 +221,23 @@ class _AppDrawer extends ConsumerWidget {
         ),
       ),
     );
+  }
+
+  /// Checks for a newer release and opens the update page (or says you're up to date).
+  Future<void> _openUpdate(BuildContext context, WidgetRef ref) async {
+    final router = GoRouter.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    Navigator.of(context).pop(); // close drawer
+    ref.invalidate(latestReleaseProvider);
+    await ref.read(latestReleaseProvider.future);
+    final available = ref.read(availableUpdateProvider);
+    if (available != null) {
+      router.push('/update', extra: available);
+    } else {
+      messenger.showSnackBar(
+        const SnackBar(content: Text('You are on the latest version.')),
+      );
+    }
   }
 
   void _confirmLogout(BuildContext context, WidgetRef ref) {
