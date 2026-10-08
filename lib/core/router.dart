@@ -9,6 +9,7 @@ import '../features/chat/conversation_screen.dart';
 import '../features/chat/conversations_screen.dart';
 import '../features/classes/class_detail_screen.dart';
 import '../features/classes/home_screen.dart';
+import '../features/classes/reschedule_requests_screen.dart';
 import '../features/community/community_feed_screen.dart';
 import '../features/discipline/discipline_screen.dart';
 import '../features/materials/materials_screen.dart';
@@ -106,6 +107,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/profile',
         builder: (context, state) => const ProfileScreen(),
+      ),
+      GoRoute(
+        path: '/reschedule-requests',
+        builder: (context, state) => const RescheduleRequestsScreen(),
       ),
       GoRoute(
         path: '/reports',

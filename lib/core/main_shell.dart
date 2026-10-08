@@ -155,6 +155,12 @@ class _AppDrawer extends ConsumerWidget {
                 title: const Text('My Attendance'),
                 onTap: () => go('/attendance'),
               ),
+            if (user?.isTeacher == true)
+              ListTile(
+                leading: const Icon(Icons.event_repeat_outlined),
+                title: const Text('Reschedule Requests'),
+                onTap: () => go('/reschedule-requests'),
+              ),
             ListTile(
               leading: const Icon(Icons.bar_chart_outlined),
               title: Text(user?.isTeacher == true ? 'My Reports & Salary' : 'Reports'),

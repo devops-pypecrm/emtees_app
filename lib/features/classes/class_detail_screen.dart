@@ -268,6 +268,79 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
     );
   }
 
+  Future<void> _requestReschedule(String sessionId) async {
+    final reasonCtrl = TextEditingController();
+    DateTime? picked;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setLocal) => AlertDialog(
+          title: const Text('Request reschedule'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              OutlinedButton.icon(
+                icon: const Icon(Icons.event),
+                label: Text(picked == null
+                    ? 'Pick new date & time'
+                    : DateFormat('EEE, MMM d · h:mm a').format(picked!)),
+                onPressed: () async {
+                  final now = DateTime.now();
+                  final d = await showDatePicker(
+                    context: ctx,
+                    initialDate: now,
+                    firstDate: now,
+                    lastDate: now.add(const Duration(days: 60)),
+                  );
+                  if (d == null || !ctx.mounted) return;
+                  final t = await showTimePicker(context: ctx, initialTime: TimeOfDay.now());
+                  if (t == null) return;
+                  setLocal(() => picked = DateTime(d.year, d.month, d.day, t.hour, t.minute));
+                },
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: reasonCtrl,
+                maxLines: 3,
+                decoration: const InputDecoration(labelText: 'Reason', border: OutlineInputBorder()),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+            FilledButton(
+              onPressed: () {
+                if (picked == null || reasonCtrl.text.trim().isEmpty) return;
+                Navigator.pop(ctx, true);
+              },
+              child: const Text('Send'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (ok != true || picked == null) return;
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      await ref.read(classesRepositoryProvider).requestReschedule(
+            sessionId,
+            proposedAt: picked!,
+            reason: reasonCtrl.text.trim(),
+          );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Reschedule request sent to admin.')),
+      );
+    } catch (e) {
+      if (mounted) setState(() => _error = e.toString());
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   List<Widget> _buildActions(ScheduleEntry entry, bool isTeacher) {
     if (widget.isOneToOne) {
       final session = entry.session!;
@@ -283,6 +356,14 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
                 : const Icon(Icons.videocam_outlined),
             label: Text(entry.isLive ? 'Rejoin session' : 'Start session'),
           ),
+          if (!entry.isLive) ...[
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              onPressed: _busy ? null : () => _requestReschedule(session.id),
+              icon: const Icon(Icons.event_repeat_outlined),
+              label: const Text('Request reschedule'),
+            ),
+          ],
         ];
       }
       // Student

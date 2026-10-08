@@ -35,6 +35,21 @@ class ClassesRepository {
         .toList();
   }
 
+  Future<void> requestReschedule(
+    String sessionId, {
+    required DateTime proposedAt,
+    required String reason,
+  }) =>
+      _api.postJson('/one-to-one/$sessionId/reschedule-request', body: {
+        'proposedScheduledAt': proposedAt.toUtc().toIso8601String(),
+        'reason': reason,
+      });
+
+  Future<List<Map<String, dynamic>>> fetchRescheduleRequests() async {
+    final data = await _api.getList('/reschedule-requests');
+    return data.cast<Map<String, dynamic>>();
+  }
+
   Future<MeetingDetails> getMeetingDetails(String classId) async {
     final data = await _api.getJson('/classes/$classId/meeting');
     return MeetingDetails.fromJson(data);
