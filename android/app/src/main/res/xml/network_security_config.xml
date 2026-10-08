@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Cleartext (plain HTTP) is only allowed for known dev hosts. Production
+  (https://gecouncil.com, nginx-proxied to the EC2 app) uses real TLS and is
+  covered by the secure default below — no exception needed for it.
+-->
+<network-security-config>
+    <domain-config cleartextTrafficPermitted="true">
+        <!-- Android emulator loopback to the host machine -->
+        <domain includeSubdomains="false">10.0.2.2</domain>
+        <!--
+          Testing on a physical device against a locally-run dev server needs
+          your machine's LAN IP added here too (network security config does
+          not support CIDR ranges) — add e.g. <domain>192.168.1.23</domain>
+          for the duration of that test, then remove it again.
+        -->
+    </domain-config>
+    <base-config cleartextTrafficPermitted="false" />
+</network-security-config>

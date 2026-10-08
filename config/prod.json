@@ -1,0 +1,5 @@
+{
+  "API_BASE_URL": "https://gecouncil.com/api/mobile",
+  "SOCKET_BASE_URL": "https://gecouncil.com",
+  "JITSI_SERVER_URL": "https://meet.gecouncil.com"
+}
