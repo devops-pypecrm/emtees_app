@@ -21,6 +21,7 @@ class CallScreen extends ConsumerStatefulWidget {
     required this.displayName,
     this.isModerator = false,
     this.oneToOneSessionId,
+    this.classId,
   });
 
   final String roomName;
@@ -28,6 +29,7 @@ class CallScreen extends ConsumerStatefulWidget {
   final String displayName;
   final bool isModerator;
   final String? oneToOneSessionId;
+  final String? classId;
 
   @override
   ConsumerState<CallScreen> createState() => _CallScreenState();
@@ -92,6 +94,7 @@ class _CallScreenState extends ConsumerState<CallScreen>
             _statusMessage = null;
             _joined = true;
           });
+          _reportPresence('join');
           _maybeStartHeartbeat();
         },
         conferenceTerminated: (url, error) {
@@ -102,6 +105,25 @@ class _CallScreenState extends ConsumerState<CallScreen>
         },
       ),
     );
+  }
+
+  bool _presenceJoined = false;
+
+  /// Tells the backend when this user enters/leaves the call; attendance,
+  /// reports and salary are computed from these times. Never throws.
+  void _reportPresence(String eventType) {
+    if (eventType == 'join' && _presenceJoined) return;
+    if (eventType == 'leave' && !_presenceJoined) return;
+    if (widget.oneToOneSessionId == null && widget.classId == null) return;
+    _presenceJoined = eventType == 'join';
+    ref
+        .read(classesRepositoryProvider)
+        .reportPresence(
+          classId: widget.classId,
+          sessionId: widget.oneToOneSessionId,
+          eventType: eventType,
+        )
+        .catchError((_) {});
   }
 
   void _maybeStartHeartbeat() {
@@ -116,6 +138,7 @@ class _CallScreenState extends ConsumerState<CallScreen>
   void _handleEnd() {
     if (_ended || !mounted) return;
     _ended = true;
+    _reportPresence('leave');
     _heartbeatTimer?.cancel();
     ref.read(scheduleProvider.notifier).refresh();
     if (Navigator.of(context).canPop()) {
@@ -126,6 +149,7 @@ class _CallScreenState extends ConsumerState<CallScreen>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _reportPresence('leave');
     _heartbeatTimer?.cancel();
     super.dispose();
   }

@@ -81,6 +81,7 @@ final routerProvider = Provider<GoRouter>((ref) {
             displayName: extra['displayName'] as String? ?? 'User',
             isModerator: extra['isModerator'] as bool? ?? false,
             oneToOneSessionId: extra['oneToOneSessionId'] as String?,
+            classId: extra['classId'] as String?,
           );
         },
       ),

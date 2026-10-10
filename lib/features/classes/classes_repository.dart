@@ -108,6 +108,18 @@ class ClassesRepository {
     return OneToOneMeetingResult.fromJson(data);
   }
 
+  /// Reports entering/leaving the call so the server can compute attendance.
+  Future<void> reportPresence({
+    String? classId,
+    String? sessionId,
+    required String eventType,
+  }) {
+    final path = sessionId != null
+        ? '/one-to-one/$sessionId/presence'
+        : '/classes/$classId/presence';
+    return _api.postJson(path, body: {'eventType': eventType});
+  }
+
   Future<void> sendHeartbeat(String sessionId, {bool? bothPresent}) =>
       _api.postJson('/one-to-one/$sessionId/heartbeat', body: {
         if (bothPresent != null) 'bothPresent': bothPresent,

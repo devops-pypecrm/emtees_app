@@ -105,6 +105,7 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
         'jwt': meeting.jwt,
         'displayName': user?.name ?? 'Teacher',
         'isModerator': meeting.isModerator,
+        'classId': item.id,
       });
     });
   }
@@ -119,6 +120,7 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
         'jwt': meeting.jwt,
         'displayName': user?.name ?? 'Student',
         'isModerator': meeting.isModerator,
+        'classId': item.id,
       });
     });
   }
