@@ -122,17 +122,19 @@ class _TeacherReports extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
-      length: 3,
+      length: 4,
       child: Scaffold(
         appBar: AppBar(
           title: const Text('My Reports'),
           bottom: const TabBar(tabs: [
             Tab(text: 'Today'),
+            Tab(text: 'Sessions'),
             Tab(text: 'Date range'),
             Tab(text: 'Salary'),
           ]),
         ),
-        body: const TabBarView(children: [_TodayTab(), _RangeTab(), _SalaryTab()]),
+        body: const TabBarView(
+            children: [_TodayTab(), _SessionsTab(), _RangeTab(), _SalaryTab()]),
       ),
     );
   }
@@ -187,6 +189,210 @@ class _TodayTabState extends ConsumerState<_TodayTab> {
           ],
         );
       },
+    );
+  }
+}
+
+class _SessionsTab extends ConsumerStatefulWidget {
+  const _SessionsTab();
+
+  @override
+  ConsumerState<_SessionsTab> createState() => _SessionsTabState();
+}
+
+class _SessionsTabState extends ConsumerState<_SessionsTab> {
+  late DateTimeRange _range;
+  Future<List<Map<String, dynamic>>>? _future;
+
+  @override
+  void initState() {
+    super.initState();
+    final now = DateTime.now();
+    _range = DateTimeRange(start: DateTime(now.year, now.month, 1), end: now);
+    _load();
+  }
+
+  void _load() {
+    setState(() {
+      _future = ref.read(reportsRepositoryProvider).sessions(_ymd(_range.start), _ymd(_range.end));
+    });
+  }
+
+  Future<void> _pick() async {
+    final picked = await showDateRangePicker(
+      context: context,
+      firstDate: DateTime(2023),
+      lastDate: DateTime.now(),
+      initialDateRange: _range,
+    );
+    if (picked != null) {
+      _range = picked;
+      _load();
+    }
+  }
+
+  String _mins(dynamic v) {
+    final n = v is num ? v : num.tryParse('$v') ?? 0;
+    return n == n.roundToDouble() ? '${n.toInt()}' : n.toStringAsFixed(1);
+  }
+
+  void _openDetail(Map<String, dynamic> s) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (_) => _SessionDetailSheet(
+        type: '${s['type']}',
+        id: '${s['id']}',
+        title: '${s['title'] ?? 'Session'}',
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final fmt = DateFormat('MMM d');
+    return Column(
+      children: [
+        ListTile(
+          leading: const Icon(Icons.date_range),
+          title: Text('${fmt.format(_range.start)} – ${fmt.format(_range.end)}'),
+          trailing: const Icon(Icons.edit_calendar_outlined),
+          onTap: _pick,
+        ),
+        Expanded(
+          child: _AsyncBody<List<Map<String, dynamic>>>(
+            future: _future,
+            onRetry: _load,
+            builder: (context, rows) {
+              if (rows.isEmpty) {
+                return ListView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  children: const [
+                    Padding(padding: EdgeInsets.all(48), child: Center(child: Text('No sessions in this range.'))),
+                  ],
+                );
+              }
+              return ListView.builder(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.all(12),
+                itemCount: rows.length,
+                itemBuilder: (context, i) {
+                  final s = rows[i];
+                  final at = DateTime.tryParse('${s['scheduledAt']}')?.toLocal();
+                  final students = ((s['students'] as List?) ?? []).cast<Map<String, dynamic>>();
+                  final who = students.isEmpty
+                      ? 'No students'
+                      : students.length == 1
+                          ? '${students.first['name']}'
+                          : '${students.length} students';
+                  final valid = s['valid'];
+                  final status = '${s['status']}';
+                  late final String label;
+                  late final Color color;
+                  if (valid == true) {
+                    label = 'Counted';
+                    color = Colors.green;
+                  } else if (valid == false) {
+                    label = 'Not counted';
+                    color = Colors.red;
+                  } else if (status == 'ongoing') {
+                    label = 'Live';
+                    color = Colors.blue;
+                  } else {
+                    label = 'Pending';
+                    color = Colors.orange;
+                  }
+                  final stu = students.length == 1
+                      ? ' · Student ${_mins(students.first['minutes'])} min'
+                      : '';
+                  return Card(
+                    child: ListTile(
+                      onTap: () => _openDetail(s),
+                      title: Text(
+                          '${at != null ? DateFormat('EEE, MMM d · h:mm a').format(at) : 'Session'} · $who'),
+                      subtitle: Text(
+                          '${s['sessionLength'] ?? '-'} min class · You ${_mins(s['teacherMinutes'])} min$stu'),
+                      trailing: Text(label,
+                          style: TextStyle(color: color, fontWeight: FontWeight.w600)),
+                    ),
+                  );
+                },
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _SessionDetailSheet extends ConsumerStatefulWidget {
+  const _SessionDetailSheet({required this.type, required this.id, required this.title});
+
+  final String type;
+  final String id;
+  final String title;
+
+  @override
+  ConsumerState<_SessionDetailSheet> createState() => _SessionDetailSheetState();
+}
+
+class _SessionDetailSheetState extends ConsumerState<_SessionDetailSheet> {
+  late final Future<Map<String, dynamic>> _future =
+      ref.read(reportsRepositoryProvider).sessionDetail(widget.type, widget.id);
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: MediaQuery.of(context).size.height * 0.7,
+      child: FutureBuilder<Map<String, dynamic>>(
+        future: _future,
+        builder: (context, snap) {
+          if (snap.connectionState != ConnectionState.done) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (snap.hasError) return Center(child: Text('${snap.error}'));
+          final d = snap.data!;
+          final students = ((d['students'] as List?) ?? []).cast<Map<String, dynamic>>();
+          final events = ((d['events'] as List?) ?? []).cast<Map<String, dynamic>>();
+          final tf = DateFormat('h:mm:ss a');
+          return ListView(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+            children: [
+              Text(widget.title, style: Theme.of(context).textTheme.titleLarge),
+              const SizedBox(height: 4),
+              Text('You stayed ${d['teacherMinutes'] ?? 0} min of ${d['sessionLength'] ?? '-'} min'),
+              const SizedBox(height: 16),
+              Text('Students', style: Theme.of(context).textTheme.titleMedium),
+              if (students.isEmpty) const Text('No students recorded.'),
+              ...students.map((s) => ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: Text('${s['name']}'),
+                    subtitle: Text('${s['minutes'] ?? 0} min in the call'),
+                    trailing: Text('${s['attendance'] ?? '-'}'),
+                  )),
+              const SizedBox(height: 16),
+              Text('Joined / left', style: Theme.of(context).textTheme.titleMedium),
+              if (events.isEmpty)
+                const Text('No join/leave times were recorded for this session.'),
+              ...events.map((e) {
+                final t = DateTime.tryParse('${e['timestamp']}')?.toLocal();
+                return ListTile(
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                  leading: Icon(
+                    e['eventType'] == 'join' ? Icons.login : Icons.logout,
+                    color: e['eventType'] == 'join' ? Colors.green : Colors.red,
+                  ),
+                  title: Text('${e['name']} ${e['eventType'] == 'join' ? 'joined' : 'left'}'),
+                  trailing: Text(t != null ? tf.format(t) : ''),
+                );
+              }),
+            ],
+          );
+        },
+      ),
     );
   }
 }

@@ -18,6 +18,16 @@ class ReportsRepository {
     return data.cast<Map<String, dynamic>>();
   }
 
+  Future<List<Map<String, dynamic>>> sessions(String startDate, String endDate) async {
+    final data = await _api.getList('/reports/sessions',
+        query: {'startDate': startDate, 'endDate': endDate});
+    return data.cast<Map<String, dynamic>>();
+  }
+
+  Future<Map<String, dynamic>> sessionDetail(String type, String id) {
+    return _api.getJson('/reports/session/$type/$id');
+  }
+
   Future<Map<String, dynamic>> mySalary(String month) {
     return _api.getJson('/reports/my-salary', query: {'month': month});
   }
