@@ -179,10 +179,10 @@ class _TodayTabState extends ConsumerState<_TodayTab> {
               _Stat('Assigned', '${_int(d['assigned'])}'),
               _Stat('Completed', '${_int(d['completed'])}', color: Colors.green),
               _Stat('Pending', '$pending', color: Colors.orange),
-              _Stat('Invalid (under 25 min)', '${_int(d['invalid'])}', color: Colors.red),
+              _Stat('Invalid (under 20 min)', '${_int(d['invalid'])}', color: Colors.red),
             ]),
             const SizedBox(height: 12),
-            const Text('A class counts once you and the student have both stayed at least 25 minutes. '
+            const Text('A class counts once you and the student have both stayed at least 20 minutes. '
                 'A drop of up to 5 minutes is bridged if you rejoin.'),
           ],
         );
@@ -351,7 +351,7 @@ class _SalaryTabState extends ConsumerState<_SalaryTab> {
                 ]),
                 const SizedBox(height: 12),
                 const Text('Rates: ₹75 / 30 min · ₹100 / 45 min · ₹125 / 60 min unless your own rates are set. '
-                    'Only valid classes (25+ minutes) are counted.'),
+                    'Only valid classes (20+ minutes) are counted.'),
               ],
             ),
           ),
