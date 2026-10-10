@@ -4,8 +4,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../features/auth/auth_provider.dart';
+import '../features/call/incoming_call_dialog.dart';
 import '../features/chat/chat_provider.dart';
 import '../features/notifications/notifications_provider.dart';
+import '../features/realtime/socket_service.dart';
 import '../features/updates/update_provider.dart';
 import '../models/user.dart';
 
@@ -43,6 +45,41 @@ class _MainShellState extends ConsumerState<MainShell> {
     }
   }
 
+  bool _ringing = false;
+
+  /// Shows the full-screen incoming-call prompt when the teacher starts a
+  /// session (1:1 call event, or a group class starting in the student's
+  /// batch). Hosted here so it appears on top of whichever tab is open.
+  Future<void> _onRealtimeEvent(RealtimeEvent event) async {
+    final user = ref.read(authProvider).user;
+    if (user == null || !user.isStudent || _ringing) return;
+
+    String? route;
+    String title;
+    String caller;
+    if (event.type == '1to1:incoming_call') {
+      final id = event.payload['sessionId']?.toString();
+      if (id == null) return;
+      route = '/class/$id?oneToOne=true';
+      title = event.payload['title']?.toString() ?? '1:1 session';
+      caller = event.payload['teacherName']?.toString() ?? 'Your teacher';
+    } else if (event.type == 'class:started') {
+      final id = event.payload['classId']?.toString();
+      if (id == null) return;
+      route = '/class/$id';
+      title = event.payload['title']?.toString() ?? 'Live class';
+      caller = 'Your teacher';
+    } else {
+      return;
+    }
+
+    _ringing = true;
+    final joined = await showIncomingCallDialog(context,
+        title: title, callerName: caller);
+    _ringing = false;
+    if (joined && mounted) context.push(route);
+  }
+
   @override
   void dispose() {
     _notchController.dispose();
@@ -53,6 +90,11 @@ class _MainShellState extends ConsumerState<MainShell> {
   Widget build(BuildContext context) {
     final unreadChats = ref.watch(conversationsProvider).totalUnread;
     final scheme = Theme.of(context).colorScheme;
+
+    ref.listen(realtimeEventsProvider, (previous, next) {
+      final event = next.valueOrNull;
+      if (event != null) _onRealtimeEvent(event);
+    });
 
     return Scaffold(
       key: ref.watch(mainScaffoldKeyProvider),

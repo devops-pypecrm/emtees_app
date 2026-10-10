@@ -90,8 +90,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       if ({'class:started', 'class:ended', 'class:updated'}
           .contains(event.type)) {
         ref.read(scheduleProvider.notifier).refresh();
-      } else if (event.type == '1to1:incoming_call') {
-        _showIncomingCallBanner(event.payload);
       }
     });
 
@@ -130,36 +128,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       lastDate: DateTime.now().add(const Duration(days: 365)),
     );
     if (picked != null) setState(() => _dateFilter = picked);
-  }
-
-  void _showIncomingCallBanner(Map<String, dynamic> payload) {
-    if (!mounted) return;
-    final sessionId = payload['sessionId']?.toString();
-    final title = payload['title']?.toString() ?? '1:1 session';
-    final teacherName = payload['teacherName']?.toString() ?? 'Your teacher';
-    ScaffoldMessenger.of(context).showMaterialBanner(
-      MaterialBanner(
-        leading: const Icon(Icons.call, color: Colors.green),
-        content: Text('$teacherName started "$title" — join now'),
-        actions: [
-          TextButton(
-            onPressed: () {
-              ScaffoldMessenger.of(context).hideCurrentMaterialBanner();
-            },
-            child: const Text('Dismiss'),
-          ),
-          FilledButton(
-            onPressed: () {
-              ScaffoldMessenger.of(context).hideCurrentMaterialBanner();
-              if (sessionId != null) {
-                context.push('/class/$sessionId?oneToOne=true');
-              }
-            },
-            child: const Text('Join'),
-          ),
-        ],
-      ),
-    );
   }
 
   Widget _buildBody(ScheduleState state, {required bool isTeacher}) {

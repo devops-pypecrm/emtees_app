@@ -12,7 +12,7 @@ VERSION_NAME="${1:-1.0.11}"
 BUILD_NUMBER="${2:-12}"
 NOTES="${3:-Reports and salary for teachers, class report for students, reschedule requests, App Update in the sidebar.}"
 
-PEM="${EMTEES_PEM:-$HOME/Downloads/emtees.pem}"
+PEM="${EMTEES_PEM:-$HOME/Projects/Emtees/emtees.pem}"
 HOST="${EMTEES_HOST:-ubuntu@13.235.19.185}"
 REMOTE_ENV="${EMTEES_REMOTE_ENV:-/home/ubuntu/emtees-api/server/.env}"
 API="${EMTEES_API:-https://gecouncil.com}"
