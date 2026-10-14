@@ -49,3 +49,7 @@ app.*.map.json
 /android/key.properties
 /android/app/*.jks
 /android/app/*.keystore
+
+# Private handover bundle (secrets) - never commit
+handover-private/
+handover-private.zip
