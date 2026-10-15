@@ -60,6 +60,9 @@ The REST API the app calls is mounted on the backend at `/api/mobile` (see `serv
 
 ## 4. Prerequisites (Windows)
 
+> **Step-by-step install instructions with exact versions, environment variables and fixes for common errors are in
+> [`WINDOWS_SETUP.md`](WINDOWS_SETUP.md).** The list below is the short version.
+
 1. **Flutter SDK 3.44.x stable** — https://docs.flutter.dev/get-started/install/windows. Check with `flutter --version`
    (the project expects Dart 3.12.2; a different Flutter channel/version may need small adjustments).
 2. **Android Studio** (installs the Android SDK, platform tools and an emulator). In *SDK Manager* install an
