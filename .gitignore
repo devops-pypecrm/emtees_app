@@ -53,3 +53,7 @@ app.*.map.json
 # Private handover bundle (secrets) - never commit
 handover-private/
 handover-private.zip
+
+# any copy/duplicate of the private bundle
+handover-private*/
+handover-private*.zip
