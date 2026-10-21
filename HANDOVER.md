@@ -145,7 +145,7 @@ The server holds the "latest" APK; installed apps find it through `GET /api/mobi
 It bumps the version, builds, publishes, verifies. It reads `RELEASE_PUBLISH_SECRET` from the server's `.env`
 over SSH, and **that secret is not set yet**, so the script stops with a message. Set the secret on the server
 first (instructions in the `Emtees` repo's `HANDOVER.md`), or use option B. Edit `PEM`/`HOST` at the top of the
-script (or the `EMTEES_PEM` / `EMTEES_HOST` variables) for your machine; the host is currently `13.235.121.148`.
+script (or the `EMTEES_PEM` / `EMTEES_HOST` variables) for your machine; the host is currently `52.66.45.63`.
 
 **Option B — manual (works today):** bump the version in `pubspec.yaml`, build, then:
 
