@@ -82,6 +82,33 @@ class _CallScreenState extends ConsumerState<CallScreen>
         'startWithAudioMuted': false,
         'startWithVideoMuted': false,
         'subject': '',
+        // ── Keep phones cool and data use low ──
+        // A class is a talking head + a whiteboard, so 360p is plenty. Without
+        // these limits Jitsi sends/receives ~720p, which makes phones hot and
+        // burns data even on fast networks.
+        'resolution': 360,
+        'constraints': {
+          'video': {
+            'height': {'ideal': 360, 'max': 480, 'min': 180},
+          },
+        },
+        'videoQuality': {
+          'maxBitratesVideo': {
+            'low': 150000,
+            'standard': 400000,
+            'high': 800000,
+          },
+          // Prefer hardware-accelerated H.264: far less CPU/heat than software VP8.
+          'codecPreferenceOrder': ['H264', 'VP8'],
+          'mobileCodecPreferenceOrder': ['H264', 'VP8'],
+        },
+        // Only receive a few videos at once (group classes), and stop sending
+        // video layers nobody is watching.
+        'channelLastN': 4,
+        'maxFullResolutionParticipants': 1,
+        'enableLayerSuspension': true,
+        // Skip per-participant audio-level processing (CPU).
+        'disableAudioLevels': true,
       },
     );
 
