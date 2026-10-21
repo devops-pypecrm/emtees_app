@@ -139,27 +139,24 @@ after `+` is the build number. Phones only update to a **higher build number**, 
 
 ## 8. Publish a release to users
 
-The server holds the "latest" APK; installed apps find it through `GET /api/mobile/app-releases/latest`.
-
-**Option A — script (Git Bash or macOS/Linux):** `./scripts/publish_release.sh 1.0.15 16 "Release notes"`.
-It bumps the version, builds, publishes, verifies. It reads `RELEASE_PUBLISH_SECRET` from the server's `.env`
-over SSH, and **that secret is not set yet**, so the script stops with a message. Set the secret on the server
-first (instructions in the `Emtees` repo's `HANDOVER.md`), or use option B. Edit `PEM`/`HOST` at the top of the
-script (or the `EMTEES_PEM` / `EMTEES_HOST` variables) for your machine; the host is currently `52.66.45.63`.
-
-**Option B — manual (works today):** bump the version in `pubspec.yaml`, build, then:
+One script does everything: bumps the version, builds the signed APK, uploads it, and verifies it. Run it from the
+repo root (macOS/Linux terminal, or **Git Bash** on Windows):
 
 ```bash
-curl -X POST https://gecouncil.com/api/mobile/app-releases/publish \
-  -F platform=mobile -F versionName=1.0.15 -F versionCode=16 \
-  -F "releaseNotes=What changed" \
-  -F apk=@build/app/outputs/flutter-apk/app-release.apk
-curl https://gecouncil.com/api/mobile/app-releases/latest      # must show the new version
+./scripts/publish_release.sh 1.0.16 17 "What changed in this release"
 ```
 
-(Add `-H "x-publish-secret: <secret>"` once `RELEASE_PUBLISH_SECRET` is configured.) Then commit the
-`pubspec.yaml` change. Users see the update in the app sidebar → *App Update*; a web download page exists at
-`/app` on the website.
+- `1.0.16` = visible version, `17` = build number. The build number **must be higher than the one currently published**
+  (phones only update to a higher number); the script checks this against the server and refuses otherwise.
+- It reads the publish password from the server's `.env` over SSH, so you never type or store it. It needs the server SSH key:
+  it looks for `../Emtees/emtees.pem`, `~/Projects/Emtees/emtees.pem` or `~/.ssh/emtees.pem`, or set `EMTEES_KEY=/path/to/emtees.pem`.
+- Useful options: `--dry-run` (run only the safety checks: server reachable, password present, build number valid, signing
+  files present) and `--skip-build` (publish the APK that is already built; `pubspec.yaml` must already show that version).
+- The server is `gecouncil.com` by default (`EMTEES_HOST` / `EMTEES_API` can override it).
+- When it finishes, commit the version bump: `git add pubspec.yaml && git commit -m "Release 1.0.16+17" && git push`.
+
+Users then see the update in the app sidebar → *App Update*; a web download page exists at `/app`.
+If SSH says *"REMOTE HOST IDENTIFICATION HAS CHANGED"*, the server was replaced: run `ssh-keygen -R gecouncil.com` once.
 
 ## 9. How calls and attendance work (app side)
 
