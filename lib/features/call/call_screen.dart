@@ -42,6 +42,11 @@ class _CallScreenState extends ConsumerState<CallScreen>
   bool _ended = false;
   bool _joined = false;
   String? _statusMessage = 'Connecting…';
+  Timer? _joinWatchdog;
+  bool _timedOut = false;
+
+  /// If the call has not actually started after this long, stop waiting and let the user retry.
+  static const _joinTimeout = Duration(seconds: 45);
 
   @override
   void initState() {
@@ -62,7 +67,31 @@ class _CallScreenState extends ConsumerState<CallScreen>
     }
   }
 
+  void _armJoinWatchdog() {
+    _joinWatchdog?.cancel();
+    _joinWatchdog = Timer(_joinTimeout, () async {
+      if (!mounted || _joined || _ended) return;
+      setState(() {
+        _timedOut = true;
+        _statusMessage = null;
+      });
+      try {
+        await _jitsiMeet.hangUp();
+      } catch (_) {}
+    });
+  }
+
+  Future<void> _retryJoin() async {
+    if (!mounted) return;
+    setState(() {
+      _timedOut = false;
+      _statusMessage = 'Connecting…';
+    });
+    await _join();
+  }
+
   Future<void> _join() async {
+    _armJoinWatchdog();
     final options = JitsiMeetConferenceOptions(
       serverURL: AppConfig.jitsiServerUrl,
       room: widget.roomName,
@@ -78,44 +107,25 @@ class _CallScreenState extends ConsumerState<CallScreen>
         'meeting-name.enabled': true,
         'video-share.enabled': true,
       },
+      // Keep this minimal. Extra video-quality overrides added in 1.0.15 (resolution,
+      // camera constraints, codec order, receive limits) stopped the call from
+      // ever starting on phones, so they were removed. Add quality limits back
+      // one at a time, and only after testing a real call on a phone.
       configOverrides: const {
         'startWithAudioMuted': false,
         'startWithVideoMuted': false,
         'subject': '',
-        // ── Keep phones cool and data use low ──
-        // A class is a talking head + a whiteboard, so 360p is plenty. Without
-        // these limits Jitsi sends/receives ~720p, which makes phones hot and
-        // burns data even on fast networks.
-        'resolution': 360,
-        'constraints': {
-          'video': {
-            'height': {'ideal': 360, 'max': 480, 'min': 180},
-          },
-        },
-        'videoQuality': {
-          'maxBitratesVideo': {
-            'low': 150000,
-            'standard': 400000,
-            'high': 800000,
-          },
-          // Prefer hardware-accelerated H.264: far less CPU/heat than software VP8.
-          'codecPreferenceOrder': ['H264', 'VP8'],
-          'mobileCodecPreferenceOrder': ['H264', 'VP8'],
-        },
-        // Only receive a few videos at once (group classes), and stop sending
-        // video layers nobody is watching.
-        'channelLastN': 4,
-        'maxFullResolutionParticipants': 1,
-        'enableLayerSuspension': true,
-        // Skip per-participant audio-level processing (CPU).
-        'disableAudioLevels': true,
       },
     );
 
     await _jitsiMeet.join(
       options,
       JitsiMeetEventListener(
+        conferenceWillJoin: (url) {
+          debugPrint('[call] conferenceWillJoin $url');
+        },
         conferenceJoined: (url) {
+          _joinWatchdog?.cancel();
           if (!mounted) return;
           setState(() {
             _statusMessage = null;
@@ -163,6 +173,7 @@ class _CallScreenState extends ConsumerState<CallScreen>
   }
 
   void _handleEnd() {
+    if (_timedOut) return; // we hung up because the call never started; the retry screen stays
     if (_ended || !mounted) return;
     _ended = true;
     _reportPresence('leave');
@@ -176,6 +187,7 @@ class _CallScreenState extends ConsumerState<CallScreen>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _joinWatchdog?.cancel();
     _reportPresence('leave');
     _heartbeatTimer?.cancel();
     super.dispose();
@@ -188,7 +200,32 @@ class _CallScreenState extends ConsumerState<CallScreen>
     return Scaffold(
       backgroundColor: Colors.black,
       body: Center(
-        child: _statusMessage == null
+        child: _timedOut
+            ? Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.wifi_off, color: Colors.white70, size: 48),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'The call could not start. Check your internet connection and try again.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: Colors.white),
+                    ),
+                    const SizedBox(height: 20),
+                    FilledButton(onPressed: _retryJoin, child: const Text('Try again')),
+                    const SizedBox(height: 8),
+                    TextButton(
+                      onPressed: () {
+                        if (Navigator.of(context).canPop()) Navigator.of(context).pop();
+                      },
+                      child: const Text('Close', style: TextStyle(color: Colors.white70)),
+                    ),
+                  ],
+                ),
+              )
+            : _statusMessage == null
             ? const SizedBox.shrink()
             : Column(
                 mainAxisSize: MainAxisSize.min,
