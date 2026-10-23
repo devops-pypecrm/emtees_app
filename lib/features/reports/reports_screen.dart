@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../../core/providers.dart';
 import '../auth/auth_provider.dart';
+import '../realtime/socket_service.dart';
 import 'reports_repository.dart';
 
 final reportsRepositoryProvider = Provider<ReportsRepository>((ref) {
@@ -56,7 +59,8 @@ class _AsyncBody<T> extends StatelessWidget {
     return FutureBuilder<T>(
       future: future,
       builder: (context, snap) {
-        if (snap.connectionState != ConnectionState.done) {
+        // Refreshing keeps the previous data on screen (no spinner flicker).
+        if (!snap.hasData && snap.connectionState != ConnectionState.done) {
           return const Center(child: CircularProgressIndicator());
         }
         if (snap.hasError) {
@@ -140,6 +144,32 @@ class _TeacherReports extends StatelessWidget {
   }
 }
 
+/// Keeps a report tab fresh: reloads every 30 s and whenever the server announces a class change
+/// (e.g. a student was just counted), so nobody has to pull to refresh.
+mixin _LiveRefresh<T extends ConsumerStatefulWidget> on ConsumerState<T> {
+  Timer? _liveTimer;
+
+  void reloadReport();
+
+  void startLiveRefresh() {
+    _liveTimer?.cancel();
+    _liveTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+      if (mounted) reloadReport();
+    });
+  }
+
+  void listenForClassChanges() {
+    ref.listen(realtimeEventsProvider, (previous, next) {
+      final event = next.valueOrNull;
+      if (event != null && {'class:updated', 'class:started', 'class:ended'}.contains(event.type) && mounted) {
+        reloadReport();
+      }
+    });
+  }
+
+  void stopLiveRefresh() => _liveTimer?.cancel();
+}
+
 class _TodayTab extends ConsumerStatefulWidget {
   const _TodayTab();
 
@@ -147,14 +177,24 @@ class _TodayTab extends ConsumerStatefulWidget {
   ConsumerState<_TodayTab> createState() => _TodayTabState();
 }
 
-class _TodayTabState extends ConsumerState<_TodayTab> {
+class _TodayTabState extends ConsumerState<_TodayTab> with _LiveRefresh<_TodayTab> {
   Future<List<Map<String, dynamic>>>? _future;
 
   @override
   void initState() {
     super.initState();
     _load();
+    startLiveRefresh();
   }
+
+  @override
+  void dispose() {
+    stopLiveRefresh();
+    super.dispose();
+  }
+
+  @override
+  void reloadReport() => _load();
 
   void _load() {
     setState(() {
@@ -164,6 +204,7 @@ class _TodayTabState extends ConsumerState<_TodayTab> {
 
   @override
   Widget build(BuildContext context) {
+    listenForClassChanges();
     return _AsyncBody<List<Map<String, dynamic>>>(
       future: _future,
       onRetry: _load,
@@ -200,7 +241,7 @@ class _SessionsTab extends ConsumerStatefulWidget {
   ConsumerState<_SessionsTab> createState() => _SessionsTabState();
 }
 
-class _SessionsTabState extends ConsumerState<_SessionsTab> {
+class _SessionsTabState extends ConsumerState<_SessionsTab> with _LiveRefresh<_SessionsTab> {
   late DateTimeRange _range;
   Future<List<Map<String, dynamic>>>? _future;
 
@@ -210,9 +251,22 @@ class _SessionsTabState extends ConsumerState<_SessionsTab> {
     final now = DateTime.now();
     _range = DateTimeRange(start: DateTime(now.year, now.month, 1), end: now);
     _load();
+    startLiveRefresh();
   }
 
+  @override
+  void dispose() {
+    stopLiveRefresh();
+    super.dispose();
+  }
+
+  @override
+  void reloadReport() => _load();
+
   void _load() {
+    // keep "to" at the current moment so sessions started after the tab opened still appear
+    final end = DateTime.now();
+    if (end.isAfter(_range.end)) _range = DateTimeRange(start: _range.start, end: end);
     setState(() {
       _future = ref.read(reportsRepositoryProvider).sessions(_ymd(_range.start), _ymd(_range.end));
     });
@@ -251,6 +305,7 @@ class _SessionsTabState extends ConsumerState<_SessionsTab> {
 
   @override
   Widget build(BuildContext context) {
+    listenForClassChanges();
     final fmt = DateFormat('MMM d');
     return Column(
       children: [
@@ -578,14 +633,24 @@ class _StudentReport extends ConsumerStatefulWidget {
   ConsumerState<_StudentReport> createState() => _StudentReportState();
 }
 
-class _StudentReportState extends ConsumerState<_StudentReport> {
+class _StudentReportState extends ConsumerState<_StudentReport> with _LiveRefresh<_StudentReport> {
   Future<Map<String, dynamic>>? _future;
 
   @override
   void initState() {
     super.initState();
     _load();
+    startLiveRefresh();
   }
+
+  @override
+  void dispose() {
+    stopLiveRefresh();
+    super.dispose();
+  }
+
+  @override
+  void reloadReport() => _load();
 
   void _load() {
     setState(() {
@@ -595,6 +660,7 @@ class _StudentReportState extends ConsumerState<_StudentReport> {
 
   @override
   Widget build(BuildContext context) {
+    listenForClassChanges();
     return Scaffold(
       appBar: AppBar(title: const Text('My Class Report')),
       body: _AsyncBody<Map<String, dynamic>>(
