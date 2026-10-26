@@ -7,6 +7,7 @@ import 'package:intl/intl.dart';
 import '../../core/providers.dart';
 import '../auth/auth_provider.dart';
 import '../realtime/socket_service.dart';
+import 'report_ranges.dart';
 import 'reports_repository.dart';
 
 final reportsRepositoryProvider = Provider<ReportsRepository>((ref) {
@@ -126,19 +127,25 @@ class _TeacherReports extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
-      length: 4,
+      length: 5,
       child: Scaffold(
         appBar: AppBar(
           title: const Text('My Reports'),
-          bottom: const TabBar(tabs: [
+          bottom: const TabBar(isScrollable: true, tabAlignment: TabAlignment.start, tabs: [
+            Tab(text: 'Overview'),
             Tab(text: 'Today'),
             Tab(text: 'Sessions'),
             Tab(text: 'Date range'),
             Tab(text: 'Salary'),
           ]),
         ),
-        body: const TabBarView(
-            children: [_TodayTab(), _SessionsTab(), _RangeTab(), _SalaryTab()]),
+        body: const TabBarView(children: [
+          _OverviewTab(),
+          _TodayTab(),
+          _SessionsTab(),
+          _RangeTab(),
+          _SalaryTab(),
+        ]),
       ),
     );
   }
@@ -230,6 +237,316 @@ class _TodayTabState extends ConsumerState<_TodayTab> with _LiveRefresh<_TodayTa
           ],
         );
       },
+    );
+  }
+}
+
+// ───────────────────────── overview (date presets → totals → class lists) ─────────────────────────
+
+String _presetLabel(ReportPreset p) => switch (p) {
+      ReportPreset.today => 'Today',
+      ReportPreset.yesterday => 'Yesterday',
+      ReportPreset.lastWeek => 'Last week',
+      ReportPreset.lastMonth => 'Last month',
+      ReportPreset.custom => 'Custom',
+    };
+
+String _rowStatusLabel(Map<String, dynamic> r, DateTime now) {
+  switch (bucketOfClass(r, now)) {
+    case ClassBucket.completed:
+      return 'Counted';
+    case ClassBucket.pending:
+      return '${r['status']}' == 'ongoing' ? 'Live' : 'Upcoming';
+    case ClassBucket.notTaken:
+      return '${r['status']}' == 'completed' ? 'Under minimum' : 'Not taken';
+    case ClassBucket.assigned:
+      return '';
+  }
+}
+
+Color _bucketColor(ClassBucket b) => switch (b) {
+      ClassBucket.assigned => Colors.blueGrey,
+      ClassBucket.completed => Colors.green,
+      ClassBucket.pending => Colors.orange,
+      ClassBucket.notTaken => Colors.red,
+    };
+
+String _bucketTitle(ClassBucket b) => switch (b) {
+      ClassBucket.assigned => 'Assigned classes',
+      ClassBucket.completed => 'Completed classes',
+      ClassBucket.pending => 'Pending classes',
+      ClassBucket.notTaken => 'Not taken classes',
+    };
+
+class _OverviewTab extends ConsumerStatefulWidget {
+  const _OverviewTab();
+
+  @override
+  ConsumerState<_OverviewTab> createState() => _OverviewTabState();
+}
+
+class _OverviewTabState extends ConsumerState<_OverviewTab> with _LiveRefresh<_OverviewTab> {
+  ReportPreset _preset = ReportPreset.today;
+  late DateTimeRange _range;
+  Future<List<Map<String, dynamic>>>? _future;
+
+  @override
+  void initState() {
+    super.initState();
+    _range = rangeForPreset(ReportPreset.today, DateTime.now());
+    _load();
+    startLiveRefresh();
+  }
+
+  @override
+  void dispose() {
+    stopLiveRefresh();
+    super.dispose();
+  }
+
+  @override
+  void reloadReport() => _load();
+
+  void _load() {
+    // Presets are recomputed on every load so "Today" rolls over at midnight.
+    if (_preset != ReportPreset.custom) _range = rangeForPreset(_preset, DateTime.now());
+    setState(() {
+      _future = ref.read(reportsRepositoryProvider).sessions(_ymd(_range.start), _ymd(_range.end));
+    });
+  }
+
+  Future<void> _select(ReportPreset p) async {
+    if (p == ReportPreset.custom) {
+      final now = DateTime.now();
+      final picked = await showDateRangePicker(
+        context: context,
+        firstDate: DateTime(2023),
+        lastDate: now.add(const Duration(days: 365)),
+        initialDateRange: _range,
+      );
+      if (picked == null) return;
+      _range = picked;
+    }
+    _preset = p;
+    _load();
+  }
+
+  String get _rangeText {
+    final f = DateFormat('EEE, MMM d');
+    final f2 = DateFormat('MMM d, y');
+    if (_range.start == _range.end) return f2.format(_range.start);
+    return '${f.format(_range.start)} – ${f2.format(_range.end)}';
+  }
+
+  void _open(ClassBucket b, List<Map<String, dynamic>> rows) {
+    Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => _ClassListPage(bucket: b, rows: rows, rangeText: _rangeText),
+    ));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    listenForClassChanges();
+    return Column(
+      children: [
+        SizedBox(
+          height: 56,
+          child: ListView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            children: [
+              for (final p in ReportPreset.values)
+                Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: ChoiceChip(
+                    avatar: p == ReportPreset.custom ? const Icon(Icons.date_range, size: 18) : null,
+                    label: Text(_presetLabel(p)),
+                    selected: _preset == p,
+                    onSelected: (_) => _select(p),
+                  ),
+                ),
+            ],
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: Text(_rangeText, style: Theme.of(context).textTheme.titleMedium),
+          ),
+        ),
+        Expanded(
+          child: _AsyncBody<List<Map<String, dynamic>>>(
+            future: _future,
+            onRetry: _load,
+            builder: (context, rows) {
+              final now = DateTime.now();
+              final groups = <ClassBucket, List<Map<String, dynamic>>>{
+                ClassBucket.assigned: List.of(rows),
+                ClassBucket.completed: [],
+                ClassBucket.pending: [],
+                ClassBucket.notTaken: [],
+              };
+              for (final r in rows) {
+                groups[bucketOfClass(r, now)]!.add(r);
+              }
+              final width = (MediaQuery.of(context).size.width - 16 * 2 - 12) / 2;
+              Widget card(ClassBucket b, String label) => SizedBox(
+                    width: width,
+                    child: _TapStat(
+                      label: label,
+                      value: groups[b]!.length,
+                      color: _bucketColor(b),
+                      onTap: () => _open(b, groups[b]!),
+                    ),
+                  );
+              return ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.all(16),
+                children: [
+                  Wrap(spacing: 12, runSpacing: 12, children: [
+                    card(ClassBucket.assigned, 'Assigned'),
+                    card(ClassBucket.completed, 'Completed'),
+                    card(ClassBucket.pending, 'Pending'),
+                    card(ClassBucket.notTaken, 'Not taken'),
+                  ]),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Tap a box to see those classes, then tap a class to open its report.\n'
+                    'Completed = counted (you and the student both stayed the minimum time). '
+                    'Pending = live now or still to come. '
+                    'Not taken = the time passed without a class, or it ended under the minimum.',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ],
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _TapStat extends StatelessWidget {
+  const _TapStat({required this.label, required this.value, required this.color, required this.onTap});
+
+  final String label;
+  final int value;
+  final Color color;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Material(
+      color: scheme.surfaceContainerLow,
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: color.withValues(alpha: 0.5)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('$value',
+                  style: Theme.of(context)
+                      .textTheme
+                      .headlineMedium
+                      ?.copyWith(fontWeight: FontWeight.w700, color: color)),
+              const SizedBox(height: 4),
+              Row(children: [
+                Expanded(child: Text(label, style: Theme.of(context).textTheme.bodyMedium)),
+                Icon(Icons.chevron_right, size: 20, color: color),
+              ]),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// The classes behind one box. Tapping a class opens its class report.
+class _ClassListPage extends StatelessWidget {
+  const _ClassListPage({required this.bucket, required this.rows, required this.rangeText});
+
+  final ClassBucket bucket;
+  final List<Map<String, dynamic>> rows;
+  final String rangeText;
+
+  @override
+  Widget build(BuildContext context) {
+    final now = DateTime.now();
+    final color = _bucketColor(bucket);
+    final sorted = List<Map<String, dynamic>>.of(rows);
+    DateTime at(Map<String, dynamic> r) =>
+        DateTime.tryParse('${r['scheduledAt']}')?.toLocal() ?? DateTime.fromMillisecondsSinceEpoch(0);
+    // Upcoming first for pending, newest first for everything else.
+    sorted.sort((a, b) => bucket == ClassBucket.pending ? at(a).compareTo(at(b)) : at(b).compareTo(at(a)));
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(_bucketTitle(bucket)),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(28),
+          child: Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Text('${sorted.length} · $rangeText', style: Theme.of(context).textTheme.bodySmall),
+          ),
+        ),
+      ),
+      body: sorted.isEmpty
+          ? const Center(child: Padding(padding: EdgeInsets.all(32), child: Text('No classes here.')))
+          : ListView.builder(
+              padding: const EdgeInsets.all(12),
+              itemCount: sorted.length,
+              itemBuilder: (context, i) {
+                final r = sorted[i];
+                final students = ((r['students'] as List?) ?? []).cast<Map<String, dynamic>>();
+                final who = students.isEmpty
+                    ? 'No students'
+                    : students.length == 1
+                        ? '${students.first['name']}'
+                        : '${students.length} students';
+                final when = DateFormat('EEE, MMM d · h:mm a').format(at(r));
+                final label = _rowStatusLabel(r, now);
+                final b = bucketOfClass(r, now);
+                final stu = students.length == 1 ? ' · Student ${students.first['minutes'] ?? 0} min' : '';
+                return Card(
+                  child: ListTile(
+                    onTap: () => showModalBottomSheet(
+                      context: context,
+                      isScrollControlled: true,
+                      showDragHandle: true,
+                      builder: (_) => _SessionDetailSheet(
+                        type: '${r['type']}',
+                        id: '${r['id']}',
+                        title: '${r['title'] ?? 'Class'}',
+                      ),
+                    ),
+                    title: Text(who),
+                    subtitle: Text('$when\n${r['sessionLength'] ?? '-'} min class · You ${r['teacherMinutes'] ?? 0} min$stu'),
+                    isThreeLine: true,
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(label,
+                            style: TextStyle(
+                                color: bucket == ClassBucket.assigned ? _bucketColor(b) : color,
+                                fontWeight: FontWeight.w600)),
+                        const Icon(Icons.chevron_right),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
     );
   }
 }
