@@ -12,5 +12,10 @@ void main() {
     await tester.pump();
 
     expect(find.byType(MaterialApp), findsOneWidget);
+
+    // Tear the app down and let any startup timers (update check, socket retries) fire,
+    // so the test does not end with pending timers.
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump(const Duration(minutes: 2));
   });
 }

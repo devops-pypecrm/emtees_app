@@ -3,14 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/api_client.dart';
 import '../../core/providers.dart';
 import '../../models/user.dart';
-import '../chat/chat_provider.dart';
 import '../classes/classes_provider.dart';
-import '../community/community_provider.dart';
-import '../discipline/discipline_provider.dart';
-import '../materials/materials_provider.dart';
 import '../me/me_provider.dart';
 import '../notifications/notifications_provider.dart';
-import '../performance/performance_provider.dart';
 import '../realtime/socket_service.dart';
 import 'auth_repository.dart';
 
@@ -107,25 +102,18 @@ class AuthNotifier extends Notifier<AuthState> {
   }
 
   /// Clears every provider that caches data scoped to the signed-in account
-  /// (classes/schedule, chat, notifications, batches, requests, feedback,
-  /// payments, community, discipline, performance, materials, profile-edit
-  /// forms). Without this, logging out and back in as a different account
+  /// (classes/schedule, notifications, batches, requests,
+  /// payments, profile-edit forms). Without this, logging out and back in as a different account
   /// — or even the same one — kept showing stale data from the previous
   /// session until each screen happened to be manually refreshed.
   void _invalidateSessionData() {
     ref.invalidate(scheduleProvider);
-    ref.invalidate(conversationsProvider);
     ref.invalidate(notificationsProvider);
     ref.invalidate(myBatchesProvider);
     ref.invalidate(myRequestsProvider);
-    ref.invalidate(myFeedbackProvider);
     ref.invalidate(myPaymentsProvider);
     ref.invalidate(profileEditProvider);
     ref.invalidate(passwordChangeProvider);
-    ref.invalidate(communityPostsProvider);
-    ref.invalidate(disciplineProvider);
-    ref.invalidate(performanceProvider);
-    ref.invalidate(materialsProvider);
   }
 
   /// Re-fetches the current user (e.g. after a profile edit) and updates

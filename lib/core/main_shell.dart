@@ -5,7 +5,6 @@ import 'package:go_router/go_router.dart';
 
 import '../features/auth/auth_provider.dart';
 import '../features/call/incoming_call_dialog.dart';
-import '../features/chat/chat_provider.dart';
 import '../features/notifications/notifications_provider.dart';
 import '../features/realtime/socket_service.dart';
 import '../features/updates/update_provider.dart';
@@ -20,7 +19,7 @@ final mainScaffoldKeyProvider = Provider<GlobalKey<ScaffoldState>>((ref) {
   return GlobalKey<ScaffoldState>();
 });
 
-/// Bottom-nav shell hosting the three main tabs (Home, Chat, Community) via
+/// Bottom-nav shell hosting the main tabs (Home, Reports) via
 /// [StatefulShellRoute.indexedStack] so each tab keeps its own
 /// scroll/navigation state when switching, plus a shared [Drawer] reachable
 /// from all tabs holding the remaining navigation destinations.
@@ -88,7 +87,6 @@ class _MainShellState extends ConsumerState<MainShell> {
 
   @override
   Widget build(BuildContext context) {
-    final unreadChats = ref.watch(conversationsProvider).totalUnread;
     final scheme = Theme.of(context).colorScheme;
 
     ref.listen(realtimeEventsProvider, (previous, next) {
@@ -121,33 +119,15 @@ class _MainShellState extends ConsumerState<MainShell> {
             itemLabel: 'Home',
           ),
           BottomBarItem(
-            inActiveItem: _badge(
-              Icon(Icons.chat_bubble_outline, color: scheme.onSurfaceVariant),
-              unreadChats,
-            ),
-            activeItem: _badge(
-              Icon(Icons.chat_bubble, color: scheme.onPrimary),
-              unreadChats,
-            ),
-            itemLabel: 'Chat',
-          ),
-          BottomBarItem(
-            inActiveItem: Icon(Icons.forum_outlined, color: scheme.onSurfaceVariant),
-            activeItem: Icon(Icons.forum, color: scheme.onPrimary),
-            itemLabel: 'Community',
+            inActiveItem: Icon(Icons.bar_chart_outlined, color: scheme.onSurfaceVariant),
+            activeItem: Icon(Icons.bar_chart, color: scheme.onPrimary),
+            itemLabel: 'Reports',
           ),
         ],
       ),
     );
   }
 
-  Widget _badge(Widget icon, int count) {
-    if (count <= 0) return icon;
-    return Badge(
-      label: Text(count > 9 ? '9+' : '$count'),
-      child: icon,
-    );
-  }
 }
 
 class _AppDrawer extends ConsumerWidget {
@@ -181,11 +161,6 @@ class _AppDrawer extends ConsumerWidget {
               title: const Text('Notifications'),
               onTap: () => go('/notifications'),
             ),
-            ListTile(
-              leading: const Icon(Icons.groups_outlined),
-              title: const Text('My Batches'),
-              onTap: () => go('/batches'),
-            ),
             if (user?.isStudent == true)
               ListTile(
                 leading: const Icon(Icons.assignment_outlined),
@@ -209,22 +184,7 @@ class _AppDrawer extends ConsumerWidget {
               title: Text(user?.isTeacher == true ? 'My Reports & Salary' : 'Reports'),
               onTap: () => go('/reports'),
             ),
-            ListTile(
-              leading: const Icon(Icons.insights_outlined),
-              title: const Text('Performance Reports'),
-              onTap: () => go('/performance'),
-            ),
-            ListTile(
-              leading: const Icon(Icons.shield_outlined),
-              title: const Text('Discipline Records'),
-              onTap: () => go('/discipline'),
-            ),
             if (user?.isStudent == true) ...[
-              ListTile(
-                leading: const Icon(Icons.star_outline),
-                title: const Text('My Feedback'),
-                onTap: () => go('/feedback'),
-              ),
               ListTile(
                 leading: const Icon(Icons.receipt_long_outlined),
                 title: const Text('My Payments'),

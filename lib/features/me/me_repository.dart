@@ -1,6 +1,5 @@
 import '../../core/api_client.dart';
 import '../../models/my_data.dart';
-import '../../models/phase3.dart';
 
 class MeRepository {
   MeRepository(this._api);
@@ -34,35 +33,6 @@ class MeRepository {
       'newPassword': newPassword,
       'confirmPassword': newPassword,
     });
-  }
-
-  Future<FeedbackItem> createFeedback({
-    required String teacherId,
-    required String batchId,
-    String? classId,
-    required int rating,
-    String? comment,
-  }) async {
-    final data = await _api.postJson('/me/feedback', body: {
-      'teacherId': teacherId,
-      'batchId': batchId,
-      if (classId != null) 'classId': classId,
-      'rating': rating,
-      if (comment != null && comment.isNotEmpty) 'comment': comment,
-    });
-    return FeedbackItem.fromJson(data);
-  }
-
-  Future<FeedbackItem> updateFeedback(
-    String id, {
-    int? rating,
-    String? comment,
-  }) async {
-    final data = await _api.putJson('/me/feedback/$id', body: {
-      if (rating != null) 'rating': rating,
-      if (comment != null) 'comment': comment,
-    });
-    return FeedbackItem.fromJson(data);
   }
 
   Future<List<MyBatch>> fetchMyBatches() async {
@@ -101,14 +71,6 @@ class MeRepository {
 
   Future<void> cancelRequest(String id) =>
       _api.postJson('/me/requests/$id/cancel');
-
-  Future<List<FeedbackItem>> fetchMyFeedback() async {
-    final data = await _api.getList('/me/feedback');
-    return data
-        .whereType<Map>()
-        .map((e) => FeedbackItem.fromJson(e.cast<String, dynamic>()))
-        .toList();
-  }
 
   /// Shape is loosely defined by the backend (mirrors a tRPC procedure), so
   /// we accept either a bare list or an object wrapping the list under a

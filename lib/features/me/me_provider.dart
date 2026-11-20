@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/api_client.dart';
 import '../../core/providers.dart';
 import '../../models/my_data.dart';
-import '../../models/phase3.dart';
 import '../auth/auth_provider.dart';
 import 'me_repository.dart';
 
@@ -106,58 +105,6 @@ class MyRequestsNotifier extends Notifier<AsyncListState<MyRequest>> {
     } catch (_) {
       return false;
     }
-  }
-}
-
-final myFeedbackProvider =
-    NotifierProvider<MyFeedbackNotifier, AsyncListState<FeedbackItem>>(
-  MyFeedbackNotifier.new,
-);
-
-class MyFeedbackNotifier extends Notifier<AsyncListState<FeedbackItem>> {
-  @override
-  AsyncListState<FeedbackItem> build() {
-    Future.microtask(refresh);
-    return const AsyncListState(loading: true);
-  }
-
-  Future<void> refresh() async {
-    state = state.copyWith(loading: true, error: null);
-    try {
-      final items = await ref.read(meRepositoryProvider).fetchMyFeedback();
-      state = AsyncListState(items: items);
-    } catch (_) {
-      state = state.copyWith(
-        loading: false,
-        error: 'Could not load your feedback. Pull to refresh to try again.',
-      );
-    }
-  }
-
-  /// Throws [ApiException] on failure so the UI can surface the server's
-  /// message (e.g. duplicate feedback, edit window expired).
-  Future<void> submitFeedback({
-    required String teacherId,
-    required String batchId,
-    String? classId,
-    required int rating,
-    String? comment,
-  }) async {
-    await ref.read(meRepositoryProvider).createFeedback(
-          teacherId: teacherId,
-          batchId: batchId,
-          classId: classId,
-          rating: rating,
-          comment: comment,
-        );
-    await refresh();
-  }
-
-  Future<void> editFeedback(String id, {int? rating, String? comment}) async {
-    await ref
-        .read(meRepositoryProvider)
-        .updateFeedback(id, rating: rating, comment: comment);
-    await refresh();
   }
 }
 

@@ -56,8 +56,6 @@ class SocketService {
     socket.on('class:updated', (data) => _emit('class:updated', data));
     socket.on(
         '1to1:incoming_call', (data) => _emit('1to1:incoming_call', data));
-    socket.on('private_message:new',
-        (data) => _emit('private_message:new', data));
 
     socket.connect();
   }
