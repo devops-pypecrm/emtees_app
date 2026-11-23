@@ -8,6 +8,7 @@ import '../features/call/call_screen.dart';
 import '../features/classes/class_detail_screen.dart';
 import '../features/classes/home_screen.dart';
 import '../features/classes/reschedule_requests_screen.dart';
+import '../features/manage/manage_hub_screen.dart';
 import '../features/me/attendance_screen.dart';
 import '../features/me/my_payments_screen.dart';
 import '../features/me/my_requests_screen.dart';
@@ -41,6 +42,11 @@ final routerProvider = Provider<GoRouter>((ref) {
       }
       final authenticated = authState.status == AuthStatus.authenticated;
       if (!authenticated && !loggingIn) return '/login';
+      const manageRoles = {'admin', 'super_admin', 'academic_head', 'accountant', 'sales_executive'};
+      final role = ref.read(authProvider).user?.role ?? '';
+      if (authenticated && manageRoles.contains(role)) {
+        if (loggingIn || splashing || state.matchedLocation == '/home' || state.matchedLocation == '/reports') return '/manage';
+      }
       if (authenticated && (loggingIn || splashing)) return '/home';
       if (!authenticated && splashing) return '/login';
       return null;
@@ -49,6 +55,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/splash',
         builder: (context, state) => const _SplashScreen(),
+      ),
+      GoRoute(
+        path: '/manage',
+        builder: (context, state) => const ManageHubScreen(),
       ),
       GoRoute(
         path: '/login',

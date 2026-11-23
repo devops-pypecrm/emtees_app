@@ -368,15 +368,15 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
           ],
         ];
       }
-      // Student
-      if (entry.isLive) {
+      // Student: the classroom can be opened at any time until the class is finished (SRS 7.1).
+      if (entry.isLive || !entry.isPast) {
         return [
           FilledButton.icon(
             onPressed: _busy
                 ? null
                 : () => _studentJoinOneToOne(session.id),
             icon: _busy ? const _ButtonSpinner() : const Icon(Icons.videocam_outlined),
-            label: const Text('Join session'),
+            label: Text(entry.isLive ? 'Join session' : 'Join classroom'),
           ),
         ];
       }
