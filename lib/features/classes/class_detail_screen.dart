@@ -9,6 +9,7 @@ import '../../core/api_client.dart';
 import '../../models/class_item.dart';
 import '../auth/auth_provider.dart';
 import '../realtime/socket_service.dart';
+import '../manage/manage_extra.dart';
 import 'classes_provider.dart';
 import 'widgets/join_requests_panel.dart';
 import 'widgets/status_badge.dart';
@@ -347,10 +348,18 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
     if (widget.isOneToOne) {
       final session = entry.session!;
       if (entry.isPast) {
-        return [const _InfoBanner(text: 'This session has ended.')];
+        return [
+          const _InfoBanner(text: 'This session has ended.'),
+          if (isTeacher) ...[
+            const SizedBox(height: 12),
+            OutlinedButton.icon(onPressed: () => showClassNotes(context, ref, session.id), icon: const Icon(Icons.edit_note), label: const Text('Remarks / report absence')),
+          ],
+        ];
       }
       if (isTeacher) {
         return [
+          OutlinedButton.icon(onPressed: () => showClassNotes(context, ref, session.id), icon: const Icon(Icons.edit_note), label: const Text('Remarks / report absence')),
+          const SizedBox(height: 12),
           FilledButton.icon(
             onPressed: _busy ? null : () => _teacherStartOneToOne(session.id),
             icon: _busy

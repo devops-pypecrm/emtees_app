@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../auth/auth_provider.dart';
+import 'manage_extra.dart';
 import 'manage_screens.dart';
 
 /// Home for admin, academic head, accountant and counsellor logins: the same areas as the web portal, trimmed for a phone.
@@ -18,16 +19,18 @@ class ManageHubScreen extends ConsumerWidget {
     final assign = ('Assign teachers', Icons.person_add_alt_1_outlined, () => const AssignScreen() as Widget);
     final pay = ('Teacher pay', Icons.account_balance_wallet_outlined, () => const TeacherPayScreen() as Widget);
     final requests = ('Requests', Icons.mark_chat_unread_outlined, () => const RequestsScreen() as Widget);
+    final changes = ('Teacher changes', Icons.swap_horiz, () => const TeacherChangesScreen() as Widget);
+    final attendance = ('Attendance', Icons.fact_check_outlined, () => const AttendanceScreen() as Widget);
     final audit = ('Audit log', Icons.shield_outlined, () => const AuditScreen() as Widget);
     switch (role) {
       case 'sales_executive':
         return [admissions, students];
       case 'accountant':
-        return [payments, admissions, pay, students];
+        return [payments, admissions, pay, students, changes];
       case 'academic_head':
-        return [overview, assign, students, requests, users];
+        return [overview, assign, students, attendance, changes, requests, users];
       default:
-        return [overview, admissions, payments, assign, students, requests, pay, users, audit];
+        return [overview, admissions, payments, assign, students, attendance, changes, requests, pay, users, audit];
     }
   }
 

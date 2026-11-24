@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:dio/dio.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/config.dart';
@@ -33,6 +34,20 @@ class Trpc {
       return _data(r.data);
     } on DioException catch (e) {
       throw TrpcException(_message(e));
+    }
+  }
+
+  /// Uploads a picked file (PNG, JPG, WEBP, PDF up to 5 MB) with the staff login and returns its server URL.
+  Future<String> uploadDoc(PlatformFile f) async {
+    final bytes = f.bytes;
+    if (bytes == null) throw TrpcException('Could not read the file');
+    if (bytes.length > 5 * 1024 * 1024) throw TrpcException('File must be under 5 MB');
+    try {
+      final r = await _dio.post('${AppConfig.socketBaseUrl}/api/uploads/doc', data: {'filename': f.name, 'dataBase64': base64Encode(bytes)});
+      return (r.data as Map)['url'].toString();
+    } on DioException catch (e) {
+      final d = e.response?.data;
+      throw TrpcException(d is Map && d['error'] != null ? d['error'].toString() : 'Upload failed');
     }
   }
 

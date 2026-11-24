@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../manage/manage_extra.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'auth_provider.dart';
@@ -145,6 +146,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                               ),
                             )
                           : const Text('Sign in'),
+                    ),
+                    const SizedBox(height: 8),
+                    TextButton(
+                      onPressed: () => showForgotPassword(context, ref, _usernameController.text.trim()),
+                      child: const Text('Forgot password?'),
                     ),
                   ],
                 ),

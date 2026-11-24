@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../features/auth/auth_provider.dart';
+import '../features/manage/manage_extra.dart';
 import '../features/call/incoming_call_dialog.dart';
 import '../features/notifications/notifications_provider.dart';
 import '../features/realtime/socket_service.dart';
@@ -161,6 +162,18 @@ class _AppDrawer extends ConsumerWidget {
               title: const Text('Notifications'),
               onTap: () => go('/notifications'),
             ),
+            if (user?.isTeacher == true)
+              ListTile(
+                leading: const Icon(Icons.fact_check_outlined),
+                title: const Text('Student attendance'),
+                onTap: () { Navigator.pop(context); Navigator.of(context).push(MaterialPageRoute(builder: (_) => const AttendanceScreen())); },
+              ),
+            if (user?.isStudent == true)
+              ListTile(
+                leading: const Icon(Icons.support_agent),
+                title: const Text('Help & support'),
+                onTap: () { Navigator.pop(context); showSupport(context, ref); },
+              ),
             if (user?.isStudent == true)
               ListTile(
                 leading: const Icon(Icons.assignment_outlined),

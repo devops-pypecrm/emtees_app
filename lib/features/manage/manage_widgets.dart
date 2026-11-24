@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:url_launcher/url_launcher.dart';
+
+import '../../core/config.dart';
 import 'trpc.dart';
 
 /// A list screen that loads from one tRPC query, with pull-to-refresh and a built-in search box.
@@ -17,6 +20,7 @@ class RemoteList extends ConsumerStatefulWidget {
     this.fab,
     this.searchText,
     this.pick,
+    this.sorts = const {},
   });
 
   final String title;
@@ -30,6 +34,8 @@ class RemoteList extends ConsumerStatefulWidget {
   final String Function(Map<String, dynamic>)? searchText;
   /// Optional extra filter applied after loading (e.g. role tabs).
   final bool Function(Map<String, dynamic>)? pick;
+  /// Sort choices shown in the app bar: label -> value to sort by.
+  final Map<String, Object? Function(Map<String, dynamic>)> sorts;
 
   @override
   ConsumerState<RemoteList> createState() => RemoteListState();
@@ -40,6 +46,8 @@ class RemoteListState extends ConsumerState<RemoteList> {
   String? _error;
   bool _loading = true;
   String _q = '';
+  String? _sortKey;
+  bool _asc = true;
 
   @override
   void initState() {
@@ -74,8 +82,33 @@ class RemoteListState extends ConsumerState<RemoteList> {
     if (needle.isNotEmpty) {
       rows = rows.where((r) => (widget.searchText?.call(r) ?? r.values.map((v) => v is Map || v is List ? '' : '$v').join(' ')).toLowerCase().contains(needle)).toList();
     }
+    if (_sortKey != null && widget.sorts[_sortKey] != null) {
+      final f = widget.sorts[_sortKey]!;
+      int cmp(Object? a, Object? b) {
+        if (a == null && b == null) return 0;
+        if (a == null) return 1;
+        if (b == null) return -1;
+        final na = num.tryParse('$a'), nb = num.tryParse('$b');
+        if (na != null && nb != null) return na.compareTo(nb);
+        return '$a'.toLowerCase().compareTo('$b'.toLowerCase());
+      }
+      rows = [...rows]..sort((x, y) => (_asc ? 1 : -1) * cmp(f(x), f(y)));
+    }
     return Scaffold(
-      appBar: AppBar(title: Text(widget.title)),
+      appBar: AppBar(title: Text(widget.title), actions: [
+        if (widget.sorts.isNotEmpty)
+          PopupMenuButton<String>(
+            icon: Icon(Icons.sort, color: _sortKey != null ? Theme.of(context).colorScheme.primary : null),
+            tooltip: 'Sort',
+            onSelected: (k) => setState(() {
+              if (k == '_clear') { _sortKey = null; } else if (_sortKey == k) { _asc = !_asc; } else { _sortKey = k; _asc = true; }
+            }),
+            itemBuilder: (c) => [
+              for (final k in widget.sorts.keys) PopupMenuItem(value: k, child: Row(children: [Expanded(child: Text(k)), if (_sortKey == k) Icon(_asc ? Icons.arrow_upward : Icons.arrow_downward, size: 16)])),
+              if (_sortKey != null) const PopupMenuItem(value: '_clear', child: Text('Clear sorting')),
+            ],
+          ),
+      ]),
       floatingActionButton: widget.fab?.call(context, _load),
       body: Column(children: [
         if (widget.header != null && _rows != null) widget.header!(context, all),
@@ -201,4 +234,9 @@ Future<Map<String, String>?> askFields(BuildContext context, String title, List<
       ]),
     ),
   );
+}
+
+Future<void> openUrl(BuildContext context, String url) async {
+  final full = url.startsWith('http') ? url : '${AppConfig.socketBaseUrl}$url';
+  if (!await launchUrl(Uri.parse(full), mode: LaunchMode.externalApplication) && context.mounted) snack(context, 'Could not open the file');
 }

@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../auth/auth_provider.dart';
+import 'manage_extra.dart';
 import 'manage_widgets.dart';
 import 'trpc.dart';
 
@@ -31,6 +32,7 @@ class _UsersState extends ConsumerState<UsersScreen> {
       input: const {'includeStudents': true},
       empty: 'No users found',
       searchText: (r) => '${r['name']} ${r['phone']} ${r['username']} ${r['employeeId']}',
+      sorts: {'Name': (r) => r['name'], 'Role': (r) => r['role'], 'Status': (r) => r['status']},
       pick: (r) => _role.isEmpty || r['role'] == _role || (_role == 'admin' && r['role'] == 'super_admin'),
       header: (c, all) => SizedBox(
         height: 52,
@@ -71,6 +73,14 @@ class StudentsScreen extends ConsumerWidget {
       input: const {'limit': 300},
       empty: 'No students found',
       searchText: (r) => '${r['name']} ${r['phone']} ${r['enrollment_id']}',
+      sorts: {'Name': (r) => r['name'], 'Student ID': (r) => r['enrollment_id'], 'Teacher': (r) => r['teacher'], 'Status': (r) => r['status'], 'Classes': (r) => r['allocated']},
+      fab: ['admin', 'super_admin', 'academic_head', 'sales_executive'].contains(ref.watch(authProvider).user?.role)
+          ? (c, refresh) => Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.end, children: [
+                FloatingActionButton.small(heroTag: 'link', tooltip: 'Registration link', onPressed: () => createRegistrationLink(c, ref), child: const Icon(Icons.add_link)),
+                const SizedBox(height: 10),
+                FloatingActionButton.extended(heroTag: 'add', icon: const Icon(Icons.person_add_alt), label: const Text('Add student'), onPressed: () async { await Navigator.of(c).push(MaterialPageRoute(builder: (_) => const AddStudentScreen())); refresh(); }),
+              ])
+          : null,
       itemBuilder: (c, s, refresh) => RowCard(
         title: '${s['name']}',
         subtitle: '${s['enrollment_id'] ?? '—'} · ${s['phone'] ?? ''}',
@@ -91,6 +101,7 @@ Future<void> _studentSheet(BuildContext context, WidgetRef ref, Map<String, dyna
       future: ref.read(trpcProvider).query('academic.studentOverview', {'studentUserId': s['id']}),
       builder: (c, snap) {
         final o = snap.data is Map ? Map<String, dynamic>.from(snap.data as Map) : null;
+        final role = ref.read(authProvider).user?.role ?? '';
         return Padding(
           padding: const EdgeInsets.fromLTRB(20, 4, 20, 28),
           child: o == null
@@ -104,9 +115,24 @@ Future<void> _studentSheet(BuildContext context, WidgetRef ref, Map<String, dyna
                     _Tile('Validity', o['validityEndDate'] == null ? '—' : '${o['remainingDays']} days'),
                   ]),
                   const SizedBox(height: 14),
+                  Row(children: [StatusPill(o['activity'] == 'Inactive' ? 'Inactive' : 'Active', color: o['activity'] == 'Inactive' ? Colors.red : Colors.green)]),
+                  const SizedBox(height: 8),
                   Text('Teacher: ${(o['teacher'] as Map?)?['name'] ?? 'not assigned'}'),
+                  if (o['payPerClass'] != null && role != 'sales_executive') Text('Teacher pay for this student: ${rupees(o['payPerClass'])} per class'),
                   Text('Course: ${o['course'] ?? '—'}   Session: ${o['sessionType'] == 'group' ? 'Group' : 'Individual'}'),
                   Text('Last class: ${dateOnly(o['lastAttendedAt'])}   Next: ${dateOnly(o['nextClassAt'])}'),
+                  if (role != 'teacher' && role != 'student') FutureBuilder(
+                    future: ref.read(trpcProvider).query('admissions.documentsFor', {'studentUserId': s['id']}),
+                    builder: (c, d) {
+                      final list = d.data is List ? (d.data as List).whereType<Map>().toList() : <Map>[];
+                      if (list.isEmpty) return const SizedBox.shrink();
+                      return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        const SizedBox(height: 14),
+                        const Text('Documents', style: TextStyle(fontWeight: FontWeight.w700)),
+                        for (final x in list) ListTile(dense: true, contentPadding: EdgeInsets.zero, leading: const Icon(Icons.attach_file, size: 18), title: Text('${x['name']}'), onTap: () => openUrl(c, '${x['url']}')),
+                      ]);
+                    },
+                  ),
                 ]),
         );
       },
@@ -145,6 +171,7 @@ class _AdmissionsState extends ConsumerState<AdmissionsScreen> {
       input: widget.onlyPending ? const {'status': 'payment_pending_verification'} : null,
       empty: widget.onlyPending ? 'No payments are waiting' : 'No admissions yet',
       searchText: (r) => '${r['fullName']} ${r['mobile']} ${r['status']}',
+      sorts: {'Newest': (r) => r['createdAt'], 'Name': (r) => r['fullName'], 'Amount': (r) => r['amountPaid'], 'Status': (r) => r['status']},
       fab: role == 'sales_executive'
           ? (c, refresh) => FloatingActionButton.extended(
                 icon: const Icon(Icons.add_link),
@@ -192,7 +219,8 @@ Future<void> _verify(BuildContext context, WidgetRef ref, Map<String, dynamic> a
         const SizedBox(height: 6),
         Text('Claimed ${rupees(a['amountPaid'])} · ${a['paymentMethod'] ?? ''} · ref ${a['transactionRef'] ?? '—'}'),
         Text('Counsellor: ${a['counsellorName'] ?? '—'}'),
-        if ((a['receiptUrl'] ?? '').toString().isNotEmpty) Padding(padding: const EdgeInsets.only(top: 6), child: Text('Receipt: $_siteOrigin${a['receiptUrl']}', style: const TextStyle(fontSize: 12))),
+        if ((a['receiptUrl'] ?? '').toString().isNotEmpty) ListTile(dense: true, contentPadding: EdgeInsets.zero, leading: const Icon(Icons.receipt_long_outlined, size: 18), title: const Text('Payment receipt'), onTap: () => openUrl(c, '${a['receiptUrl']}')),
+        for (final d in ((a['documents'] as List?) ?? []).whereType<Map>()) ListTile(dense: true, contentPadding: EdgeInsets.zero, leading: const Icon(Icons.attach_file, size: 18), title: Text('${d['name']}'), onTap: () => openUrl(c, '${d['url']}')),
         const SizedBox(height: 16),
         Row(children: [
           Expanded(child: OutlinedButton(onPressed: () => Navigator.pop(c, 'reject'), child: const Text('Reject'))),
@@ -281,8 +309,10 @@ Future<void> _pickTeacher(BuildContext context, WidgetRef ref, Map<String, dynam
     ),
   );
   if (picked == null || !context.mounted) return;
+  final pay = await askFields(context, 'Pay for ${picked['name']}', [const Fld('pay', 'Pay per class for this student (₹)', number: true)], confirm: 'Assign teacher');
+  if (pay == null) return;
   try {
-    await api.mutate('academic.assignTeacher', {'studentUserId': a['studentUserId'], 'teacherId': picked['id'], 'admissionId': a['id'], 'preferredTiming': a['preferredTiming']});
+    await api.mutate('academic.assignTeacher', {'studentUserId': a['studentUserId'], 'teacherId': picked['id'], 'admissionId': a['id'], 'preferredTiming': a['preferredTiming'], 'payPerClass': (pay['pay'] ?? '').isEmpty ? null : num.tryParse(pay['pay']!)});
     if (context.mounted) snack(context, 'Assigned to ${picked['name']}');
     refresh();
   } catch (e) {
@@ -308,6 +338,7 @@ class TeacherPayScreen extends StatelessWidget {
       path: 'finance.settlementSummary',
       empty: 'No remuneration entries yet',
       searchText: (r) => '${r['name']}',
+      sorts: {'Name': (r) => r['name'], 'Pending': (r) => r['pending'], 'Approved': (r) => r['approved'], 'Paid': (r) => r['paid']},
       itemBuilder: (c, r, refresh) => RowCard(
         title: '${r['name']}',
         subtitle: '${r['classes']} classes',
